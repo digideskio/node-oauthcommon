@@ -66,7 +66,7 @@ module.exports.create = function (conf/*, app, pkgConf, pkgDeps*/) {
     }
   , { tablename: 'api_keys'
     , idname: 'id'
-    , indices: ['createdAt', 'updatedAt', 'oauthClientId']
+    , indices: ['createdAt', 'updatedAt', 'oauthClientId', 'url']
     , belongsTo: ['oauthClient'] // TODO pluralization
     , schema: function () {
         return {

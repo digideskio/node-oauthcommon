@@ -90,7 +90,7 @@ module.exports.create = function (conf/*, app, pkgConf, pkgDeps*/) {
       return PromiseA.resolve(inProcessCache[experienceId]);
     }
 
-    var mq = require('masterquest');
+    var mq = require('masterquest-sqlite3');
     var path = require('path');
     // TODO how can we encrypt this?
     var systemFactory = createClientFactory({
@@ -124,21 +124,21 @@ module.exports.create = function (conf/*, app, pkgConf, pkgDeps*/) {
     }).then(function (sqlStore) {
       //var db = factory.
       return mq.wrap(sqlStore, dir).then(function (models) {
-        return require('./oauthclient-microservice/lib/sign-token').create(models.PrivateKey).init().then(function (signer) {
+        //return require('oauthclient-microservice/lib/sign-token').create(models.PrivateKey).init().then(function (signer) {
           var CodesCtrl = require('authcodes').create(models.Codes);
           /* models = { Logins, Verifications } */
-          var LoginsCtrl = require('./authentication-microservice/lib/logins').create({}, CodesCtrl, models);
+          var LoginsCtrl = require('authentication-microservice/lib/logins').create({}, CodesCtrl, models);
           /* models = { ApiKeys, OauthClients } */
-          var ClientsCtrl = require('./oauthclient-microservice/lib/oauthclients').createController({}, models, signer);
+          //var ClientsCtrl = require('oauthclient-microservice/lib/oauthclients').createController({}, models, signer);
 
           return {
             Codes: CodesCtrl
           , Logins: LoginsCtrl
-          , Clients: ClientsCtrl
+          //, Clients: ClientsCtrl
           , SqlFactory: clientFactory
           , models: models
           };
-        });
+        //});
       });
     }).then(function (ctrls) {
       inProcessCache[experienceId] = ctrls;

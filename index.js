@@ -20,8 +20,6 @@ module.exports.inject = function (getControllers, app/*, pkgConf, pkgDeps*/) {
   // TODO How can we help apps handle this? token?
   // TODO allow apps to configure trustedDomains, auth, etc
 
-  //function weakDecipher(secret, val) { return require('./weak-crypt').weakDecipher(val, secret); }
-
   //
   // Generic Session / Login / Account Routes
   //
@@ -137,7 +135,7 @@ module.exports.inject = function (getControllers, app/*, pkgConf, pkgDeps*/) {
       return Controllers.models.AccountsLogins.find({ loginId: loginId }).then(function (accounts) {
         return PromiseA.all(accounts.map(function (obj) {
           return Controllers.models.Accounts.get(obj.accountId)/*.then(function (account) {
-            account.appScopedId = weakCipher(oauthClient.secret, account.id);
+            account.appScopedId = scoper.scope(account.id, oauthClient.secret);
             return account;
           })*/;
         }));

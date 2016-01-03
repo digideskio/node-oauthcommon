@@ -95,24 +95,27 @@ module.exports.create = function (conf/*, app, pkgConf, pkgDeps*/) {
     // TODO how can we encrypt this?
     var systemFactory = createClientFactory({
       // TODO only complain if the values are different
-        algorithm: 'aes'
-      , bits: 128
-      , mode: 'cbc'
-      , dirname: path.join(__dirname, '..', '..', 'var') // TODO info.conf
+        dirname: path.join(__dirname, '..', '..', 'var') // TODO info.conf
+
+      , prefix: 'org.oauth3.' // 'com.example.'
       //, prefix: appname.replace(/\//g, ':') // 'com.example.'
       //, dbname: 'cluster'
       , suffix: ''
-      , ext: '.sqlcipher'
+      , ext: '.sqlite3'
       , sock: conf.sqlite3Sock
       , ipcKey: conf.ipcKey
     });
     var clientFactory = createClientFactory({
     // TODO only complain if the values are different
       dirname: path.join(__dirname, '..', '..', 'var') // TODO info.conf
-    , prefix: 'com.oauth3' // 'com.example.'
+    , algorithm: 'aes'
+    , bits: 128
+    , mode: 'cbc'
+
+    , prefix: 'org.oauth3.' // 'com.example.'
     //, dbname: 'config'
     , suffix: ''
-    , ext: '.sqlite3'
+    , ext: '.sqlcipher'
     , sock: conf.sqlite3Sock
     , ipcKey: conf.ipcKey
     });

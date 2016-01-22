@@ -6,8 +6,9 @@ module.exports.create = function (conf/*, app, pkgConf, pkgDeps*/) {
   var inProcessCache = {};
   var createClientFactory = require('sqlite3-cluster/client').createClientFactory;
   var dir = require('./example-directives');
+  var jwt;
 
-  function getAppScopedDb(experienceId) {
+  function getAppScopedFactories(experienceId) {
     if (inProcessDbCache[experienceId]) {
       return PromiseA.resolve(inProcessDbCache[experienceId]);
     }
@@ -63,30 +64,75 @@ module.exports.create = function (conf/*, app, pkgConf, pkgDeps*/) {
       return PromiseA.resolve(inProcessCache[experienceId]);
     }
 
-    getAppScopedDb.then(function (stuff) {
+    inProcessCache[experienceId] = getAppScopedFactories(experienceId).then(function (stuff) {
       var sqlStore = stuff.sqlStore;
       var clientFactory = stuff.clientFactory;
 
-      inProcessCache[experienceId] = mq.wrap(sqlStore, dir).then(function (models) {
-        //return require('oauthclient-microservice/lib/sign-token').create(models.PrivateKey).init().then(function (signer) {
-          var CodesCtrl = require('authcodes').create(models.Codes);
-          /* models = { Logins, Verifications } */
-          var LoginsCtrl = require('authentication-microservice/lib/logins').create({}, CodesCtrl, models);
-          /* models = { ApiKeys, OauthClients } */
-          var ClientsCtrl = require('oauthclient-microservice/lib/oauthclients').createController({}, models);
+      return mq.wrap(sqlStore, dir).then(function (models) {
+        var CodesCtrl = require('authcodes').create(models.Codes);
+        /* models = { Logins, Verifications } */
+        var LoginsCtrl = require('authentication-microservice/lib/logins').create({}, CodesCtrl, models);
+        /* models = { ApiKeys, OauthClients } */
+        var ClientsCtrl = require('oauthclient-microservice/lib/oauthclients').createController({}, models);
 
-          return {
-            Db: stuff.sqlStore
-          , Codes: CodesCtrl
-          , Logins: LoginsCtrl
-          , Clients: ClientsCtrl
-          , SqlFactory: clientFactory
-          , models: models
+        var results = {
+          Db: models // stuff.sqlStore
+        , Codes: CodesCtrl
+        , Logins: LoginsCtrl
+        , Clients: ClientsCtrl
+        , SqlFactory: clientFactory
+        , models: models
+        };
+
+        return require('oauthclient-microservice/lib/create-client').getOrCreateClient(results, {
+          experienceId: experienceId
+        , keyUrlId: experienceId
+        }).then(function (oauthClient) {
+          //return require('oauthclient-microservice/lib/sign-token').create(models.PrivateKey).init().then(function (signer) {
+          //});
+
+          results.Oauth3RootClient = oauthClient;
+          results.Oauth3RootKey = oauthClient.apiKeys.filter(function (apiKey) {
+            return apiKey.url === experienceId;
+          })[0];
+          results.Signer = {
+            sign: function (data) {
+              jwt = jwt || PromiseA.promisifyAll(require('jsonwebtoken'));
+
+              data.iss = results.Oauth3RootClient.url;
+              // k for 'key of client'
+              data.k = data.k || results.Oauth3RootKey.id;
+              data.sub = '/api/org.oauth3.keypairs/' + results.Oauth3RootKey.id + '.pub';
+
+              return PromiseA.resolve(jwt.sign(data, results.Oauth3RootKey.priv, { algorithm: 'RS256' }));
+            }
+          , verifyAsync: function (experienceId, token) {
+              jwt = jwt || PromiseA.promisifyAll(require('jsonwebtoken'));
+
+              var decoded = jwt.decode(token, { complete: true });
+
+              if (!decoded) {
+                return null;
+              }
+
+              //console.log(decoded.header);
+
+              // TODO enable trusting of other issuers
+              if (decoded.payload.iss !== experienceId) {
+                console.error('issuer does not match', decoded.payload.iss, experienceId);
+                return null;
+              }
+
+              return jwt.verifyAsync(token, results.Oauth3RootKey.pub, { algorithm: 'RS256' /*, ignoreExpiration: true */});
+            }
           };
-        //});
+
+          return results;
+        });
       });
     }).then(function (ctrls) {
       inProcessCache[experienceId] = ctrls;
+
       return ctrls;
     });
 

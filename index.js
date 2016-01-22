@@ -127,7 +127,7 @@ module.exports.inject = function (getControllers, app/*, pkgConf, pkgDeps*/) {
   }
 
   function getAccountsByLogin(req, token, priv, Controllers, loginId, decrypt) {
-    return getClient(req, req.oauth.token, priv).then(function (oauthClient) {
+    return getClient(req, req.oauth.token, priv, Controllers).then(function (oauthClient) {
       if (decrypt) {
         loginId = scoper.unscope(loginId, oauthClient.secret);
       }
@@ -179,7 +179,7 @@ module.exports.inject = function (getControllers, app/*, pkgConf, pkgDeps*/) {
     return req.oauth3._accounts;
   }
 
-  function getLoginIds(req, token, priv/*, Controllers*/) {
+  function getLoginIds(req, token, priv, Controllers) {
     if (!token) {
       token = req.oauth3.token;
     }
@@ -195,7 +195,7 @@ module.exports.inject = function (getControllers, app/*, pkgConf, pkgDeps*/) {
     // perhaps the oauthClient secret should be sent, encrypted with a master key,
     // with the request? Or just mash the oauthClient secret with the loginId
     // and encrypt with the master key?
-    priv[cacheId] = getClient(req, token, priv).then(function (oauthClient) {
+    priv[cacheId] = getClient(req, token, priv, Controllers).then(function (oauthClient) {
       var loginIds = [];
 
       if (token.usr) {

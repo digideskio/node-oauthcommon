@@ -75,7 +75,7 @@ module.exports.create = function (conf/*, app, pkgConf, pkgDeps*/) {
         /* models = { ApiKeys, OauthClients } */
         var ClientsCtrl = require('oauthclient-microservice/lib/oauthclients').createController({}, models);
 
-        var results = {
+        var Controllers = {
           Db: models // stuff.sqlStore
         , Codes: CodesCtrl
         , Logins: LoginsCtrl
@@ -84,35 +84,38 @@ module.exports.create = function (conf/*, app, pkgConf, pkgDeps*/) {
         , models: models
         };
 
-        return require('oauthclient-microservice/lib/create-client').getOrCreateClient(results, {
+        return require('oauthclient-microservice/lib/create-client').getOrCreateClient(Controllers, {
           experienceId: experienceId
         , keyUrlId: experienceId
         }).then(function (oauthClient) {
           //return require('oauthclient-microservice/lib/sign-token').create(models.PrivateKey).init().then(function (signer) {
           //});
 
-          results.Oauth3RootClient = oauthClient;
-          results.Oauth3RootKey = oauthClient.apiKeys.filter(function (apiKey) {
+          Controllers.Oauth3RootClient = oauthClient;
+          Controllers.Oauth3RootKey = oauthClient.apiKeys.filter(function (apiKey) {
             return apiKey.url === experienceId;
           })[0];
-          results.Signer = {
+          Controllers.Signer = {
             sign: function (data) {
               jwt = jwt || PromiseA.promisifyAll(require('jsonwebtoken'));
 
-              data.iss = results.Oauth3RootClient.url;
+              data.iss = Controllers.Oauth3RootClient.url;
               // k for 'key of client'
-              data.k = data.k || results.Oauth3RootKey.id;
-              data.sub = '/api/org.oauth3.keypairs/' + results.Oauth3RootKey.id + '.pub';
+              data.k = data.k || Controllers.Oauth3RootKey.id;
+              data.sub = '/api/org.oauth3.keypairs/' + Controllers.Oauth3RootKey.id + '.pub';
 
-              return PromiseA.resolve(jwt.sign(data, results.Oauth3RootKey.priv, { algorithm: 'RS256' }));
+              return PromiseA.resolve(jwt.sign(data, Controllers.Oauth3RootKey.priv, { algorithm: 'RS256' }));
             }
           , verifyAsync: function (experienceId, token) {
               jwt = jwt || PromiseA.promisifyAll(require('jsonwebtoken'));
 
               var decoded = jwt.decode(token, { complete: true });
+              var err;
 
               if (!decoded) {
-                return null;
+                err = new Error("Invalid JWT");
+                err.code = "E_INVALID_JWT";
+                return PromiseA.reject(err);
               }
 
               //console.log(decoded.header);
@@ -123,11 +126,11 @@ module.exports.create = function (conf/*, app, pkgConf, pkgDeps*/) {
                 return null;
               }
 
-              return jwt.verifyAsync(token, results.Oauth3RootKey.pub, { algorithm: 'RS256' /*, ignoreExpiration: true */});
+              return jwt.verifyAsync(token, Controllers.Oauth3RootKey.pub, { algorithm: 'RS256' /*, ignoreExpiration: true */});
             }
           };
 
-          return results;
+          return Controllers;
         });
       });
     }).then(function (ctrls) {

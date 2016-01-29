@@ -112,7 +112,11 @@ module.exports.inject = function (getControllers, app/*, pkgConf, pkgDeps*/) {
     }
 
     // TODO could get client directly by token.app (id of client)
-    priv[cacheId] = Controllers.Clients.login(null, pubkey).then(function (apiKey) {
+    //console.log('[oauthcommon] token', token);
+    priv[cacheId] = Controllers.Clients.login(null, pubkey, null, {
+      id: token.k // TODO client id or key id?
+    , clientUri: token.iss
+    }).then(function (apiKey) {
       if (!apiKey) {
         return PromiseA.reject(new Error("Client no longer valid"));
       }
@@ -279,24 +283,25 @@ module.exports.inject = function (getControllers, app/*, pkgConf, pkgDeps*/) {
           return;
         }
 
-        req.oauth3.token = token;
+        req.oauth3.encodedToken = token;
+        req.oauth3.token = data;
 
         req.oauth3.getLoginIds = function (token) {
-          getLoginIds(req, (token || req.oauth3.token), privs, Controllers);
+          return getLoginIds(req, (token || req.oauth3.token), privs, Controllers);
         };
 
         req.oauth3.getLogins = function (token) {
-          getLogins(req, (token || req.oauth3.token), privs, Controllers);
+          return getLogins(req, (token || req.oauth3.token), privs, Controllers);
         };
 
         // TODO modify prototypes?
         req.oauth3.getClient = function (token) {
-          getClient(req, (token || req.oauth3.token), privs, Controllers);
+          return getClient(req, (token || req.oauth3.token), privs, Controllers);
         };
 
         // TODO req.oauth3.getAccountIds
         req.oauth3.getAccounts = function (token) {
-          getAccounts(req, (token || req.oauth3.token), privs, Controllers);
+          return getAccounts(req, (token || req.oauth3.token), privs, Controllers);
         };
 
         next();

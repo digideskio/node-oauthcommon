@@ -121,8 +121,8 @@ module.exports.create = function (conf/*, app, pkgConf, pkgDeps*/) {
               //console.log(decoded.header);
 
               // TODO enable trusting of other issuers
-              if (decoded.payload.iss !== experienceId) {
-                console.error('issuer does not match', decoded.payload.iss, experienceId);
+              if ((decoded.payload.iss || decoded.payload.app) !== experienceId) {
+                console.error('issuer does not match', (decoded.payload.iss || decoded.payload.app), experienceId);
                 return null;
               }
 

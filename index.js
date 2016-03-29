@@ -50,6 +50,7 @@ module.exports.inject = function (getControllers, app/*, pkgConf, pkgDeps*/) {
     }
 
     // TODO disallow query with req.method === 'GET'
+    // NOTE: the case of DDNS on routers requires a GET and access_token
     // (cookies should be used for protected static assets)
     if (req.query && req.query.access_token) {
       if (token) { PromiseA.reject(new Error("token already exists in either header or body and also in query")); }
@@ -131,7 +132,7 @@ module.exports.inject = function (getControllers, app/*, pkgConf, pkgDeps*/) {
   }
 
   function getAccountsByLogin(req, token, priv, Controllers, loginId, decrypt) {
-    return getClient(req, req.oauth.token, priv, Controllers).then(function (oauthClient) {
+    return getClient(req, req.oauth3.token, priv, Controllers).then(function (oauthClient) {
       if (decrypt) {
         loginId = scoper.unscope(loginId, oauthClient.secret);
       }
@@ -259,13 +260,13 @@ module.exports.inject = function (getControllers, app/*, pkgConf, pkgDeps*/) {
     var privs = {};
     req.oauth3 = {};
 
-    getControllers(req.experienceId).then(function (Controllers) {
+    return parseAccessToken(req).then(function (token) {
+      if (!token) {
+        next();
+        return;
+      }
 
-      return parseAccessToken(req).then(function (token) {
-        if (!token) {
-          next();
-          return;
-        }
+      return getControllers(req.experienceId).then(function (Controllers) {
 
         var jwt = require('jsonwebtoken');
         var data = jwt.decode(token);
@@ -302,6 +303,20 @@ module.exports.inject = function (getControllers, app/*, pkgConf, pkgDeps*/) {
         // TODO req.oauth3.getAccountIds
         req.oauth3.getAccounts = function (token) {
           return getAccounts(req, (token || req.oauth3.token), privs, Controllers);
+        };
+
+        req.oauth3.verifyAsync = function (encodedToken) {
+          return Controllers.Signer.verifyAsync(req.experienceId, (encodedToken || req.oauth3.encodedToken));
+        };
+
+        req.oauth3.rescope = function (acx) {
+          var scoper = require('app-scoped-ids');
+
+          return req.oauth3.getClient().then(function (oauthClient) {
+            var id = scoper.unscope(acx, oauthClient.secret);
+
+            return scoper.scope(id, Controllers.Oauth3RootClient.secret);
+          });
         };
 
         next();

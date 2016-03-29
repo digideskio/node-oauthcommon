@@ -168,20 +168,18 @@ module.exports.inject = function (getControllers, app/*, pkgConf, pkgDeps*/) {
     if ((req.oauth3.token.idx || req.oauth3.token.usr) && ('password' === req.oauth3.token.grt || 'login' === req.oauth3.token.as)) {
       priv._accounts = getAccountsByLogin(req, req.oauth3.token, priv, Controllers, (req.oauth3.token.idx || req.oauth3.token.usr), !!req.oauth3.token.idx);
     } else if (req.oauth3.token.axs && req.oauth3.token.axs.length || req.oauth3.token.acx) {
-      req.oauth3._accounts = getAccountsByArray(req, Controllers, req.oauth3.token.axs && req.oauth3.token.axs.length && req.oauth3.token.axs || [req.oauth3.token.acx]);
+      priv._accounts = getAccountsByArray(req, Controllers, req.oauth3.token.axs && req.oauth3.token.axs.length && req.oauth3.token.axs || [req.oauth3.token.acx]);
     } else {
       err = new Error("neither login nor accounts were specified");
       err.code = "E_NO_AUTHZ";
-      req.oauth3._accounts = PromiseA.reject(err);
+      priv._accounts = PromiseA.reject(err);
     }
 
-    req.oauth3._accounts.then(function (accounts) {
-      req.oauth3._accounts = accounts;
+    return priv._accounts.then(function (accounts) {
+      priv._accounts = accounts;
 
       return accounts;
     });
-
-    return req.oauth3._accounts;
   }
 
   function getLoginIds(req, token, priv, Controllers) {

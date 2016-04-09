@@ -115,8 +115,14 @@ module.exports.inject = function (getControllers, app/*, pkgConf, pkgDeps*/) {
     // TODO could get client directly by token.app (id of client)
     //console.log('[oauthcommon] token', token);
     priv[cacheId] = Controllers.Clients.login(null, pubkey, null, {
-      id: token.k // TODO client id or key id?
-    , clientUri: token.iss
+      id: token.k               // TODO client id or key id?
+      // (TODO implicit?) req.headers.origin, req.headers.referer, (NOT req.headers.host)
+    , clientUri: token.iss      // token, clientUri,
+
+      // tokens may not be shared across different sites
+    , origin: req.headers.origin
+    , referer: req.headers.referer
+    , isDeviceClient: !(req.headers.origin || req.headers.referer) || undefined
     }).then(function (apiKey) {
       if (!apiKey) {
         return PromiseA.reject(new Error("Client no longer valid"));
@@ -139,10 +145,11 @@ module.exports.inject = function (getControllers, app/*, pkgConf, pkgDeps*/) {
 
       return Controllers.models.AccountsLogins.find({ loginId: loginId }).then(function (accounts) {
         return PromiseA.all(accounts.map(function (obj) {
-          return Controllers.models.Accounts.get(obj.accountId)/*.then(function (account) {
+          //console.log('DEBUG AccountsLogins', obj);
+          return Controllers.models.Accounts.get(obj.accountId).then(function (account) {
             account.appScopedId = scoper.scope(account.id, oauthClient.secret);
             return account;
-          })*/;
+          });
         }));
       });
     });

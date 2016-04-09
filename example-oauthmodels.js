@@ -84,7 +84,11 @@ module.exports.create = function (conf/*, app, pkgConf, pkgDeps*/) {
         , models: models
         };
 
-        return require('oauthclient-microservice/lib/create-client').getOrCreateClient(Controllers, {
+        var config = {};
+
+        var OauthClients = require('oauthclient-microservice/lib/oauthclients').createController(config, models);
+
+        return OauthClients.getOrCreateClient(config, {
           experienceId: experienceId
         , keyUrlId: experienceId
         }).then(function (oauthClient) {
@@ -117,8 +121,6 @@ module.exports.create = function (conf/*, app, pkgConf, pkgDeps*/) {
                 err.code = "E_INVALID_JWT";
                 return PromiseA.reject(err);
               }
-
-              //console.log(decoded.header);
 
               // TODO enable trusting of other issuers
               if ((decoded.payload.iss || decoded.payload.app) !== experienceId) {

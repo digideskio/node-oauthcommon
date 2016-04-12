@@ -1,6 +1,9 @@
 'use strict';
 
 module.exports = [
+  //
+  // Logins & AuthCodes
+  //
   { tablename: 'codes'
   , idname: 'uuid'
   , indices: ['createdAt']

@@ -30,6 +30,7 @@ module.exports.inject = function (getControllers, app/*, pkgConf, pkgDeps*/) {
     var credentials;
 
     if (req.headers && req.headers.authorization) {
+      // Works for all of Authorization: Bearer {{ token }}, Token {{ token }}, JWT {{ token }}
       parts = req.headers.authorization.split(' ');
 
       if (parts.length !== 2) {

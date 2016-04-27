@@ -88,7 +88,7 @@ module.exports.create = function (conf/*, app, pkgConf, pkgDeps*/) {
 
         var OauthClients = require('oauthclient-microservice/lib/oauthclients').createController(config, models);
 
-        return OauthClients.getOrCreateClient(config, {
+        return OauthClients.getOrCreateRootClient(config, {
           experienceId: experienceId
         , keyUrlId: experienceId
         }).then(function (oauthClient) {

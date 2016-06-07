@@ -101,12 +101,16 @@ module.exports.create = function (conf/*, app, pkgConf, pkgDeps*/) {
           })[0];
           Controllers.Signer = {
             sign: function (data) {
+              // TODO allow signing as azp with azp's private key?
               jwt = jwt || PromiseA.promisifyAll(require('jsonwebtoken'));
 
+              if (data.iss && data.iss !== Controllers.Oauth3RootClient.url) {
+                console.warn("[WARN] overwriting token issuer `iss' with root client");
+              }
+
               data.iss = Controllers.Oauth3RootClient.url;
-              // k for 'key of client'
+              data.kid = data.kid || Controllers.Oauth3RootKey.id;
               data.k = data.k || Controllers.Oauth3RootKey.id;
-              data.sub = '/api/org.oauth3.keypairs/' + Controllers.Oauth3RootKey.id + '.pub';
 
               return PromiseA.resolve(jwt.sign(data, Controllers.Oauth3RootKey.priv, { algorithm: 'RS256' }));
             }

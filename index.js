@@ -106,15 +106,16 @@ module.exports.inject = function (getControllers, app/*, pkgConf, pkgDeps*/) {
     // if the app is imgur
     //var issuer = token.iss;
     // TODO this needs to be a fingerprint, not the whole key
-    var pubkey = (token.pub || token.k);
+    var pubkey = (token.pub || token.k); // TODO token.kid
     var cacheId = '_' + pubkey + 'Client';
 
     if (priv[cacheId]) {
       return PromiseA.resolve(priv[cacheId]);
     }
 
+    console.log("[DEBUG] getClient (token):");
+    console.log(token);
     // TODO could get client directly by token.app (id of client)
-    //console.log('[oauthcommon] token', token);
     priv[cacheId] = Controllers.Clients.login(null, pubkey, null, {
       id: token.k               // TODO client id or key id?
       // (TODO implicit?) req.headers.origin, req.headers.referer, (NOT req.headers.host)
@@ -124,6 +125,7 @@ module.exports.inject = function (getControllers, app/*, pkgConf, pkgDeps*/) {
     , origin: req.headers.origin
     , referer: req.headers.referer
     , isDeviceClient: !(req.headers.origin || req.headers.referer) || undefined
+    , skipAuth: true
     }).then(function (apiKey) {
       if (!apiKey) {
         return PromiseA.reject(new Error("Client no longer valid"));
@@ -148,18 +150,51 @@ module.exports.inject = function (getControllers, app/*, pkgConf, pkgDeps*/) {
         return PromiseA.all(accounts.map(function (obj) {
           //console.log('DEBUG AccountsLogins', obj);
           return Controllers.models.Accounts.get(obj.accountId).then(function (account) {
+            // half-deleted accounts
+            if (!account) {
+              return null;
+            }
             account.appScopedId = scoper.scope(account.id, oauthClient.secret);
             return account;
           });
-        }));
+        })).then(function (accounts) {
+          return accounts.filter(function (account) { return account; });
+        });
       });
     });
   }
 
-  function getAccountsByArray(req, Controllers, arr) {
-    return PromiseA.all(arr.map(function (accountId) {
-      return Controllers.models.Accounts.get(accountId.id || accountId);
-    }));
+  function getAccountsByArray(req, token, priv, Controllers, arr) {
+    return getClient(req, token, priv, Controllers).then(function (oauthClient) {
+      //console.log("[DEBUG] getAccountsByArray");
+      //console.log(arr);
+      //console.log(oauthClient);
+      //console.log(token);
+      return PromiseA.all(arr.map(function (meta) {
+        var accountIdx = meta.ppid || meta.sub || meta.appScopedId || meta.id || meta;
+        //console.log("[DEBUG] getAccountsByArray accountIdx:", accountIdx);
+        var accountId = scoper.unscope(accountIdx, oauthClient.secret);
+
+        return Controllers.models.Accounts.get(accountId);
+      })).then(function (accounts) {
+        return accounts.filter(function (account) { return account; }).map(function (account) {
+          account.appScopedId = scoper.scope(account.id, oauthClient.secret);
+          return account;
+        });
+      });
+    });
+  }
+
+  function getAccountIds(req, token, priv, Controllers) {
+    return getClient(req, token, priv, Controllers).then(function (oauthClient) {
+      var accounts = req.oauth3.token.axs && req.oauth3.token.axs.length
+        || req.oauth3.token.acx && [req.oauth3.token.acx]
+        || [];
+
+      return accounts.map(function (acc) {
+        return scoper.unscope(acc.appScopedId || acc.id, oauthClient.secret);
+      });
+    });
   }
 
   function getAccounts(req, token, priv, Controllers) {
@@ -173,10 +208,13 @@ module.exports.inject = function (getControllers, app/*, pkgConf, pkgDeps*/) {
       return PromiseA.resolve(priv._accounts);
     }
 
-    if ((req.oauth3.token.idx || req.oauth3.token.usr) && ('password' === req.oauth3.token.grt || 'login' === req.oauth3.token.as)) {
-      priv._accounts = getAccountsByLogin(req, req.oauth3.token, priv, Controllers, (req.oauth3.token.idx || req.oauth3.token.usr), !!req.oauth3.token.idx);
-    } else if (req.oauth3.token.axs && req.oauth3.token.axs.length || req.oauth3.token.acx) {
-      priv._accounts = getAccountsByArray(req, Controllers, req.oauth3.token.axs && req.oauth3.token.axs.length && req.oauth3.token.axs || [req.oauth3.token.acx]);
+    if ((token.idx || token.usr) && ('password' === token.grt || 'login' === token.as)) {
+      priv._accounts = getAccountsByLogin(req, token, priv, Controllers, (token.idx || token.usr), !!token.idx);
+    } else if (token.axs && token.axs.length || token.acx) {
+      //console.log("[DEBUG] token[axs,acx]:");
+      //console.log(token.axs);
+      //console.log(token.acx);
+      priv._accounts = getAccountsByArray(req, token, priv, Controllers, token.axs && token.axs.length && token.axs || [token.acx]);
     } else {
       err = new Error("neither login nor accounts were specified");
       err.code = "E_NO_AUTHZ";
@@ -307,6 +345,10 @@ module.exports.inject = function (getControllers, app/*, pkgConf, pkgDeps*/) {
         };
 
         // TODO req.oauth3.getAccountIds
+        req.oauth3.getAccountIds = function (token) {
+          return getAccountIds(req, (token || req.oauth3.token), privs, Controllers);
+        };
+
         req.oauth3.getAccounts = function (token) {
           return getAccounts(req, (token || req.oauth3.token), privs, Controllers);
         };
@@ -323,6 +365,11 @@ module.exports.inject = function (getControllers, app/*, pkgConf, pkgDeps*/) {
 
             return scoper.scope(id, Controllers.Oauth3RootClient.secret);
           });
+        };
+
+        req.oauth3.getRootClient = function () {
+          // TODO security, don't disclose all properties
+          return Controllers.Oauth3RootClient;
         };
 
         next();

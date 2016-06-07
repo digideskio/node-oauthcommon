@@ -80,6 +80,6 @@ module.exports = [
   }
 , { tablename: 'grants'
   , idname: 'id' // sha256(scope + oauthClientId + (accountId || loginId))
-  , indices: ['createdAt', 'updatedAt', 'oauthClientId', 'loginId', 'accountId']
+  , indices: ['createdAt', 'updatedAt', 'oauthClientId', 'loginId', 'accountId', 'scope']
   }
 ];

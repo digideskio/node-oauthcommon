@@ -113,8 +113,8 @@ module.exports.inject = function (getControllers, app/*, pkgConf, pkgDeps*/) {
       return PromiseA.resolve(priv[cacheId]);
     }
 
-    console.log("[DEBUG] getClient (token):");
-    console.log(token);
+    //console.log("[DEBUG] getClient (token):");
+    //console.log(token);
     // TODO could get client directly by token.app (id of client)
     priv[cacheId] = Controllers.Clients.login(null, pubkey, null, {
       id: token.k               // TODO client id or key id?
@@ -147,19 +147,22 @@ module.exports.inject = function (getControllers, app/*, pkgConf, pkgDeps*/) {
       }
 
       return Controllers.models.AccountsLogins.find({ loginId: loginId }).then(function (accounts) {
+        //console.log('DEBUG AccountsLogins', accounts);
         return PromiseA.all(accounts.map(function (obj) {
           //console.log('DEBUG AccountsLogins', obj);
           return Controllers.models.Accounts.get(obj.accountId).then(function (account) {
             // half-deleted accounts
             if (!account) {
-              return null;
+              account = {};
+              account.id = obj.accountId;
+              account.deletedAt = new Date();
+              account.deleted = true;
+              //return null;
             }
             account.appScopedId = scoper.scope(account.id, oauthClient.secret);
             return account;
           });
-        })).then(function (accounts) {
-          return accounts.filter(function (account) { return account; });
-        });
+        }));
       });
     });
   }
@@ -209,11 +212,13 @@ module.exports.inject = function (getControllers, app/*, pkgConf, pkgDeps*/) {
     }
 
     if ((token.idx || token.usr) && ('password' === token.grt || 'login' === token.as)) {
+      //console.log("[DEBUG] getAccountsByLogin");
       priv._accounts = getAccountsByLogin(req, token, priv, Controllers, (token.idx || token.usr), !!token.idx);
     } else if (token.axs && token.axs.length || token.acx) {
       //console.log("[DEBUG] token[axs,acx]:");
       //console.log(token.axs);
       //console.log(token.acx);
+      //console.log("[DEBUG] getAccountsByArray");
       priv._accounts = getAccountsByArray(req, token, priv, Controllers, token.axs && token.axs.length && token.axs || [token.acx]);
     } else {
       err = new Error("neither login nor accounts were specified");
